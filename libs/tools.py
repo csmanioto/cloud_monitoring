@@ -16,9 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-#
 
-from config import main_config
+import os
+import configparser
+
+config_ini = os.getenv('CONFIG')
+config = configparser.ConfigParser()
+config.read(config_ini)
+general_config = config['monitoring']
+
 import logging
 import re
 from datetime import datetime
@@ -187,7 +193,7 @@ def findNumber(text):
 def sshCommand(command, hostname, username, tcpport=22, password=None, pkey=None):
     ssh_timeout = 1
     try:
-        ssh_timeout = main_config['system_ssh_timeout']
+        ssh_timeout = general_config.getint('ssh_timewout_seconds', fallback=ssh_timeout)
     except:
         pass
 
@@ -324,10 +330,13 @@ def ssh_os_linux_available_memory(host_ip, host_key=None, username=None, passwor
     if host_key is not None:
         if not ".pem" in host_key:
             host_key += ".pem"
-        key_path = main_config['aws_ssh_key_folder']
-        host_key = key_path + '/{}'.format(host_key)
+        key_path = general_config.get('pemkey_folder')
+        if key_path[:1] == '/':
+            key_path += "{}".format(host_key)
+        else:
+            host_key += '/{}'.format(host_key)
         if not check_file_permission(host_key) == '0600':
-            logger.warning("Error of file not found - file  {}".format(host_key))
+            logger.warning("Error of file not found {} in folder {}".format(host_key, general_config.get('pemkey_folder')))
             return dict_mem_full_info
         kword['pkey'] = host_key
     elif password is not None:

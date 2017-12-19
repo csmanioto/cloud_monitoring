@@ -4,13 +4,20 @@ https://www.safaribooksonline.com/library/view/mongodb-and-python/9781449312817/
 
 from pymongo import MongoClient
 import logging
+import configparser
+
 import json
 from bson import json_util
 
 from datetime import datetime
 from configparser import ConfigParser
+import os
 
-from config import main_config
+
+config_ini = os.getenv('CONFIG')
+config = configparser.ConfigParser()
+config.read(config_ini)
+mongo_config = config['mongo']
 
 
 logging.getLogger(__name__)
@@ -19,11 +26,12 @@ logging.getLogger(__name__)
 class Mongo(object):
     mongo_db = None
     conn = None
+
     def __init__(self, mongo_server=None, mongo_port=27017):
         try:
             try:
                 if  mongo_server is None:
-                    mongo_server = main_config["mongo-server"]
+                    mongo_server = mongo_config.get('server')
                 client = MongoClient("mongodb://{}".format(mongo_server))
                 self.conn = client
             except Exception as e:
@@ -36,7 +44,7 @@ class Mongo(object):
         try:
             db = self.conn[mongo_db][mongo_collection]
             inserted = db.insert_one(data)
-            logging.debug("Data has been inserted with success in MongoDB : {0}".format(inserted))
+            logging.info("Data has been inserted with success in MongoDB : {0}".format(inserted))
             return inserted
 
         except Exception as e:

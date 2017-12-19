@@ -26,14 +26,26 @@ import dateutil
 
 from libs.tools import datetime_iso8601, convert_dict_dataframe, ssh_os_linux_available_memory, \
     check_is_file_exist, df_to_picke, picke_to_dataframe, nan2floatzero, check_string_in_list
-from config import log_config, main_config
+from config import log_config
 
 import logging
 import logging.config
 import datetime
+import os
+import ast
+import configparser
+
+
+config_ini = os.getenv('CONFIG')
+config = configparser.ConfigParser()
+config.read(config_ini)
+monitoring_config = config['monitoring']
+
 
 logging.config.dictConfig(log_config)
 logging.getLogger("aws_interface")
+
+
 
 
 class AWSInterface(object):
@@ -48,7 +60,8 @@ class AWSInterface(object):
     aws_connection = None
     ec2_connection = None
     asg_connection = None
-    aws_region = main_config["aws_regions"]
+    aws_region = ast.literal_eval(monitoring_config.get("aws_regions"))
+    pass
 
     def __init__(self, test_mode=False):
         self.test_mode = test_mode
@@ -486,13 +499,7 @@ class AWSInterface(object):
 
     # IF CPU <=50% and NetworkIO <= 500Mb &FreeMemory >= 50%
     def get_low_utilization_instances(self, instance_id=None, instance_region=None, tag_key=None, tag_value=None,
-                                      max_cpu=None, max_availiableemory=None,
-                                      network=None):
-
-        if max_cpu is None or max_availiableemory is None or network is None:
-            max_cpu = main_config['system_percent_max_cpu']
-            max_availiableemory = main_config['system_percent_max_availiableemory']
-            network = int(main_config['network_io_mega'])
+                                      max_cpu=None, max_mem_available=None, network=None):
 
         report = []
         """
@@ -507,27 +514,29 @@ class AWSInterface(object):
 
         """
         if self.test_mode is True:
-            instances = main_config['system_test_mode_ids']
+            instances = ast.literal_eval(monitoring_config.get("test_instances_list"))
         elif instance_id is not None and instance_region is not None:
             instances = [{'id': instance_id, 'region': instance_region}]
         else:
             instances = self.get_simple_instances_list(state='running', tag_key=tag_key, tag_value=tag_value)
 
         df = pd.DataFrame()  # Creating a Pandas DataFrame with the aggregation data per instance.
-        instances_processeds = 0
+        instances_processed = 0
         total_instances = len(instances)
+
         pick_load = False
-        if self.test_mode and check_is_file_exist('df.pkl'):
-            df = picke_to_dataframe('df.pkl')
+        pick_file = monitoring_config.get('test_picke_file')
+        if self.test_mode and check_is_file_exist(pick_file):
+            df = picke_to_dataframe(pick_file)
             pick_load = True
         else:
             for instance in instances:
                 try:
-                    instances_processeds += 1
+                    instances_processed += 1
                     logging.debug("-----------------------------------------------------------------------------")
                     logging.debug("Starting process to instance-id {}:{}".format(instance['id'], instance['region']))
                     logging.info("Starting process to instance-id {}:{}".format(instance['id'], instance['region']))
-                    processed_perc = round((instances_processeds * 100 / total_instances), 1)
+                    processed_perc = round((instances_processed * 100 / total_instances), 1)
                     logging.debug(
                         "processed {}% - processing instance {}:{}....".format(processed_perc, instance['id'],
                                                                                instance['region']))
@@ -553,7 +562,7 @@ class AWSInterface(object):
                     pass
 
         if self.test_mode and pick_load is False:
-            df_to_picke(df, 'df.pkl')
+            df_to_picke(df, pick_file)
 
         untagged_owner = 0
         untagged_team = 0
@@ -614,12 +623,12 @@ class AWSInterface(object):
             # finding the low utilization instances using the criteria...
             network_bytes = int(network) * (1024 ** 2)
             df_low = df[(df['CPU'] <= max_cpu) &
-                        (df['AvailiableMemoryPerc'] >= max_availiableemory) &
+                        (df['AvailiableMemoryPerc'] >= max_mem_available) &
                         (df['NetworkInBytes_aggr'] <= network_bytes) &  # Network_bytes =  accumulated in the period...
                         (df['NetworkOutBytes_aggr'] <= network_bytes)]
             instances_low_utilizations = df_low.shape[0]  # fast way to get number of rows
         except Exception as e:
-            logging.error("Error on summarization low utilization instances  {}".format(e))
+            logging.error("Error on summarization low utilization instances{}".format(e))
             pass
 
         try:
@@ -630,7 +639,7 @@ class AWSInterface(object):
                 "aggregation_details": {
                     "total_examined": total_instances,  # "amount_instances_examined": 421,
                     "total_low_utilization": instances_low_utilizations,
-                    "criteria": "cpu <= {}% & mem free >= {}% & netio_aggr <= {}Mb".format(max_cpu, max_availiableemory,
+                    "criteria": "cpu <= {}% & mem free >= {}% & netio_aggr <= {}Mb".format(max_cpu, max_mem_available,
                                                                                            network),
                     "total_untagged_owner": untagged_owner,
                     "total_untagged_team": untagged_team,

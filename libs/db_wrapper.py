@@ -1,5 +1,5 @@
 from libs.db_mongo import Mongo
-from libs.db_rethink import Rethink
+#from libs.db_rethink import Rethink
 import logging
 
 
@@ -9,13 +9,16 @@ class DataStore(object):
 
     def __init__(self):
         self.mongo = Mongo()
-        self.rethink = Rethink()
+        #self.rethink = Rethink()
         pass
 
     def save(self, db, table, data):
         try:
             result = self.mongo.save(db, table, data)
-            logging.debug("Inserted into DB: {}...")
+            if result:
+                logging.debug("Inserted into DB: {}...")
+            else:
+                logging.debug("It's not error but not inserted nothing on DB")
         except Exception as e:
             logging.error("Saving error  - {}".format(e))
 
