@@ -1,51 +1,27 @@
-"""
-    AWSIternfaces -  Class/Methods to get information and reports overs AWS
-    Copyright (C) 2017  Carlos Smaniotto
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-"""
-
-import json
-import boto3
-import pandas as pd
-import numpy as  np
-from datetime import datetime, timedelta
-import dateutil
-
-from libs.tools import datetime_iso8601, convert_dict_dataframe, ssh_os_linux_available_memory, \
-    check_is_file_exist, df_to_picke, picke_to_dataframe, nan2floatzero, check_string_in_list
-from config import log_config
-
-import logging
-import logging.config
-import datetime
-import os
-import ast
-import configparser
-
-
+import configparser, os, logging
+# -----------------------------------------
+#  Reading api_config.ini
 config_ini = os.getenv('CONFIG')
-config = configparser.ConfigParser()
+config = configparser.RawConfigParser()
 config.read(config_ini)
 monitoring_config = config['monitoring']
 
-
-logging.config.dictConfig(log_config)
+# Setup the log
+log_setup = config['log']
+logger = logging.getLogger()
+formatter = logging.Formatter(fmt=log_setup.get('log_format'), datefmt=log_setup.get('log_datefmt'))
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(log_setup.get('log_level'))
 logging.getLogger("aws_interface")
+# -------------------------------------------
 
-
+import datetime, ast, json, boto3
+import pandas as pd
+from datetime import datetime, timedelta
+from libs.tools import datetime_iso8601, convert_dict_dataframe, ssh_os_linux_available_memory, \
+    check_is_file_exist, df_to_picke, picke_to_dataframe, nan2floatzero, check_string_in_list
 
 
 class AWSInterface(object):
@@ -204,11 +180,11 @@ class AWSInterface(object):
                                   period=3600):
 
         if 'days' in aggregation_type:
-            starttime = datetime.datetime.today() - timedelta(days=aggregation)
+            starttime = datetime.today() - timedelta(days=int(aggregation))
         if 'minutes' in aggregation_type:
-            starttime = datetime.datetime.today() - timedelta(minutes=aggregation)
+            starttime = datetime.today() - timedelta(minutes=int(aggregation))
 
-        endtime = datetime.datetime.today()
+        endtime = datetime.today()
 
         cpu = round(self.__avg_cloudwatch_metrics(
             self.__cloudwatch_ec2(instance_id, instance_region, 'CPUUtilization', starttime, endtime, period)), 2)
@@ -393,7 +369,6 @@ class AWSInterface(object):
             pass
 
         try:
-            # launchtime = datetime.datetime.strptime(datetime_iso8601(rs['Reservations'][0]['Instances'][0]['LaunchTime']), "%Y-%m-%dT%H:%M:%S.000Z")
             launchtime = datetime_iso8601((rs['Reservations'][0]['Instances'][0]['LaunchTime']))
         except:
             logging.warning("Error to get launchtime of instance {}:{}", format(instance_id, instance_region))
@@ -613,7 +588,7 @@ class AWSInterface(object):
             total_cost_simulated_ri = nan2floatzero(
                 df[df["instance_reservation_id"].isnull()]['cost_month_reserved'].sum())
             ri_potential_save = nan2floatzero(df[df["instance_reservation_id"].isnull()]['save_money_month'].sum())
-        except:
+        except Exception as e:
             logging.error("Error on summarization cost information... - {}".format(e))
             pass
 
@@ -633,7 +608,7 @@ class AWSInterface(object):
 
         try:
             # Creating the JSON Report...
-            now = datetime_iso8601(datetime.datetime.today())
+            now = datetime_iso8601(datetime.today())
             report = {
                 "report_date": now,
                 "aggregation_details": {

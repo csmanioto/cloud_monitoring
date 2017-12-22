@@ -1,26 +1,27 @@
-"""
-https://www.safaribooksonline.com/library/view/mongodb-and-python/9781449312817/
-"""
-
-from pymongo import MongoClient
-import logging
-import configparser
-
-import json
-from bson import json_util
-
-from datetime import datetime
-from configparser import ConfigParser
-import os
-
-
+import configparser, os, logging
+# -----------------------------------------
+#  Reading api_config.ini
 config_ini = os.getenv('CONFIG')
-config = configparser.ConfigParser()
+config = configparser.RawConfigParser()
 config.read(config_ini)
+monitoring_config = config['monitoring']
 mongo_config = config['mongo']
 
 
+# Setup the log
+log_setup = config['log']
+logger = logging.getLogger()
+formatter = logging.Formatter(fmt=log_setup.get('log_format'), datefmt=log_setup.get('log_datefmt'))
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(log_setup.get('log_level'))
 logging.getLogger(__name__)
+# -------------------------------------------
+
+
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 
 class Mongo(object):
@@ -47,8 +48,9 @@ class Mongo(object):
             logging.info("Data has been inserted with success in MongoDB : {0}".format(inserted))
             return inserted
 
-        except Exception as e:
+        except PyMongoError as e:
             logging.error("Error on insert data - Mongodb {}".format(e))
+            logging.info("I have tried to write this data: {}".format(data))
         finally:
             try:
                 self.conn.close()

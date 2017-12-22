@@ -1,34 +1,25 @@
-"""
-    CloudWrapper -  Class/Methods to get information and reports overs diferents cloudproviders.
-    Copyright (C) 2017  Carlos Smaniotto
+import configparser, os, logging
+# -----------------------------------------
+#  Reading api_config.ini
+config_ini = os.getenv('CONFIG')
+config = configparser.RawConfigParser()
+config.read(config_ini)
+monitoring_config = config['monitoring']
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
+# Setup the log
+log_setup = config['log']
+logger = logging.getLogger()
+formatter = logging.Formatter(fmt=log_setup.get('log_format'), datefmt=log_setup.get('log_datefmt'))
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(log_setup.get('log_level'))
+logging.getLogger("cloud_wrapper")
+# -------------------------------------------
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
 
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-"""
 from libs.aws_interface import AWSInterface
 from libs.db_wrapper import DataStore
-from config import main_config
-import os
-import json
-
-import logging
-import logging.config
-from config import log_config, main_config
-import datetime
-
-logging.config.dictConfig(log_config)
-logging.getLogger("cloud_wrapper")
 
 
 class CloudWrapper:

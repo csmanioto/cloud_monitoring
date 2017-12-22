@@ -1,31 +1,25 @@
-"""
-    common_tools -  Methods used as tools into the class and others pice os the project
-    Copyright (C) 2017  Carlos Smaniotto
+import configparser, os, logging
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-"""
-
-import os
-import configparser
-
+# -----------------------------------------
+#  Reading api_config.ini
 config_ini = os.getenv('CONFIG')
-config = configparser.ConfigParser()
+config = configparser.RawConfigParser()
 config.read(config_ini)
 general_config = config['monitoring']
 
-import logging
+
+# Setup the log
+log_setup = config['log']
+logger = logging.getLogger()
+formatter = logging.Formatter(fmt=log_setup.get('log_format'), datefmt=log_setup.get('log_datefmt'))
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(log_setup.get('log_level'))
+logging.getLogger("tools")
+# -------------------------------------------
+
+
 import re
 from datetime import datetime
 import datetime
@@ -39,14 +33,11 @@ import socket
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from config import log_config
 
 import logging
 import logging.config
 import re
 
-logging.config.dictConfig(log_config)
-logger = logging.getLogger("tools")
 # ---
 """Retry calling the decorated function using an exponential backoff.
    http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
